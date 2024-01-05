@@ -1,28 +1,64 @@
 import express from "express";
-
+import cors from "cors";
+import { registerUser } from "./handlers/registrationHandler.js";
+import { checkCredentials } from "./handlers/loginHandler.js";
 const app = express();
 const router = express.Router();
 const port = process.env.PORT || 3000;
 
+app.use(cors());
 app.use(express.json());
 app.use("/api", router);
-
 // Home page
-router.route('/').get((req, res) => {
-    res.send('Welcome to the Jobify home page!');
+router.route("/").get((req, res) => {
+  res.send("Welcome to the Jobify home page!");
 });
 
 // About page
-router.route('/about').get((req, res) => {
-    res.send('Learn more about Jobify on our About page');
+router.route("/about").get((req, res) => {
+  res.send("Learn more about Jobify on our About page");
 });
 
-// Login and registration
-router.route("/auth/login").post((req, res) => {
-  res.send("User login");
+// Login
+router.route("/auth/login").post(async (req, res) => {
+  try {
+    const userLoginData = req.body;
+    const loggedInUser = await checkCredentials(userLoginData.email, userLoginData.password);
+    if (loggedInUser) {
+      res.status(200).json({ message: 'Successfully logged in'});
+		} else {
+      return res.status(401).json({ message: 'Unauthorized'});
+		}
+	} catch(error) {
+		res.status(500).json({ error: 'Server error' });
+	}
 });
-router.route("/auth/signup").post((req, res) => {
-  res.send("User registration");
+
+// Registration
+router.route("/auth/signup/employer").post(async (req, res) => {
+  try {
+    const userData = req.body;
+    userData.role = "employer";
+    const employer = await registerUser(userData);
+    res
+      .status(201)
+      .json({ message: "Employer registered successfully: ", employer });
+  } catch (error) {
+    res.status(500).send("Error registering employer" + error.message);
+  }
+});
+
+router.route("/auth/signup/job-seeker").post(async (req, res) => {
+  try {
+    const userData = req.body;
+    userData.role = "job seeker";
+    const user = await registerUser(userData);
+    res
+      .status(201)
+      .json({ message: "Job seeker registered successfully", user });
+  } catch (error) {
+    res.status(500).send("Error registering job seeker" + error.message);
+  }
 });
 
 // Employer
