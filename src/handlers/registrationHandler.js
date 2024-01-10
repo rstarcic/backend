@@ -14,7 +14,13 @@ async function registerUser(userData) {
     try {
         userData.password = await _hashPassword(userData.password);
         const createdUser = await db.collection("users").insertOne(userData);
-        return _excludeProperties(createdUser, "password");
+        if (createdUser.insertedId) {
+            const user = await db.collection("users").findOne({ _id: createdUser.insertedId })
+            return _excludeProperties(user, "password" )
+        }
+        else {
+            throw new Error("User not created.")
+       }
     } catch (error) {
         throw new Error("Error in user registration: " + error.message);
     }

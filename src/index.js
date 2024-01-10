@@ -1,14 +1,23 @@
 import express from "express";
 import cors from "cors";
+import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+dotenv.config();
 import { registerUser } from "./handlers/registrationHandler.js";
 import { checkCredentials } from "./handlers/loginHandler.js";
+import { authenticateToken } from "./middlewares/authMiddleware.js";
+import { checkRole } from "./middlewares/userAccessMiddleware.js";
 const app = express();
 const router = express.Router();
 const port = process.env.PORT || 3000;
+const secret_token = process.env.JWT_SECRET_KEY;
 
 app.use(cors());
 app.use(express.json());
 app.use("/api", router);
+app.use(authenticateToken);
+app.use(checkRole);
+
 // Home page
 router.route("/").get((req, res) => {
   res.send("Welcome to the Jobify home page!");
@@ -23,15 +32,24 @@ router.route("/about").get((req, res) => {
 router.route("/auth/login").post(async (req, res) => {
   try {
     const userLoginData = req.body;
-    const loggedInUser = await checkCredentials(userLoginData.email, userLoginData.password);
+    const loggedInUser = await checkCredentials(
+      userLoginData.email,
+      userLoginData.password
+    );
     if (loggedInUser) {
-      res.status(200).json({ message: 'Successfully logged in'});
-		} else {
-      return res.status(401).json({ message: 'Unauthorized'});
-		}
-	} catch(error) {
-		res.status(500).json({ error: 'Server error' });
-	}
+      const token = jwt.sign({ userId: loggedInUser._id }, secret_token, {
+        expiresIn: "1h",
+      });
+      res.setHeader("Authorization", `Bearer ${token}`);
+      res
+        .status(200)
+        .json({ message: "Successfully logged in", token, user: loggedInUser });
+    } else {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 // Registration
@@ -40,11 +58,17 @@ router.route("/auth/signup/employer").post(async (req, res) => {
     const userData = req.body;
     userData.role = "employer";
     const employer = await registerUser(userData);
-    res
-      .status(201)
-      .json({ message: "Employer registered successfully: ", employer });
+    if (employer) {
+      const token = jwt.sign({ userId: employer._id }, secret_token, {
+        expiresIn: "1h",
+      });
+      res.setHeader("Authorization", `Bearer ${token}`);
+      res
+        .status(201)
+        .json({ message: "Employer registered successfully", token, user: employer });
+    }
   } catch (error) {
-    res.status(500).send("Error registering employer" + error.message);
+    res.status(500).send("Error registering employer " + error.message);
   }
 });
 
@@ -52,7 +76,16 @@ router.route("/auth/signup/job-seeker").post(async (req, res) => {
   try {
     const userData = req.body;
     userData.role = "job seeker";
-    const user = await registerUser(userData);
+    const jobSeeker = await registerUser(userData);
+    if (jobSeeker) {
+      const token = jwt.sign({ userId: jobSeeker._id }, secret_token, {
+        expiresIn: "1h",
+      });
+      res.setHeader("Authorization", `Bearer ${token}`);
+      res
+        .status(201)
+        .json({ message: "Employer registered successfully", token, user: jobSeeker });
+    }
     res
       .status(201)
       .json({ message: "Job seeker registered successfully", user });
@@ -119,19 +152,19 @@ router.route("/job-seeker/applied").get((req, res) => {
 // Profiles
 router
   .route("/employer/profile")
-  .get((req, res) => {
+  .get(authenticateToken, checkRole("employer"), (req, res) => {
     res.send("Employer profile retrieval");
   })
-  .put((req, res) => {
+  .put(authenticateToken, checkRole("employer"), (req, res) => {
     res.send("Employer profile update");
   });
 
 router
   .route("/job-seeker/profile")
-  .get((req, res) => {
+  .get(authenticateToken, checkRole("job-seeker"), (req, res) => {
     res.send("Job seeker profile retrieval");
   })
-  .put((req, res) => {
+  .put(authenticateToken, checkRole("job-seeker"), (req, res) => {
     res.send("Job seeker profile update");
   });
 
