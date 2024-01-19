@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 dotenv.config();
 import { registerUser } from "./handlers/registrationHandler.js";
 import { checkCredentials } from "./handlers/loginHandler.js";
+import { updateUserProfile } from "./handlers/profileHandler.js";
 import { authenticateToken } from "./middlewares/authMiddleware.js";
 import { checkRole } from "./middlewares/userAccessMiddleware.js";
 const app = express();
@@ -12,7 +13,7 @@ const router = express.Router();
 const port = process.env.PORT || 3000;
 const secret_token = process.env.JWT_SECRET_KEY;
 
-app.use(cors());
+app.use(cors({ exposedHeaders: ['authorization'] }))
 app.use(express.json());
 app.use("/api", router);
 app.use(authenticateToken);
@@ -37,10 +38,10 @@ router.route("/auth/login").post(async (req, res) => {
       userLoginData.password
     );
     if (loggedInUser) {
-      const token = jwt.sign({ userId: loggedInUser._id }, secret_token, {
+      const token = jwt.sign({ userId: loggedInUser._id, role: loggedInUser.role }, secret_token, {
         expiresIn: "1h",
       });
-      res.setHeader("Authorization", `Bearer ${token}`);
+      res.setHeader("authorization", `Bearer ${token}`);
       res
         .status(200)
         .json({ message: "Successfully logged in", token, user: loggedInUser });
@@ -59,14 +60,16 @@ router.route("/auth/signup/employer").post(async (req, res) => {
     userData.role = "employer";
     const employer = await registerUser(userData);
     if (employer) {
-      const token = jwt.sign({ userId: employer._id }, secret_token, {
+      const token = jwt.sign({ userId: employer._id, role: employer.role }, secret_token, {
         expiresIn: "1h",
       });
-      res.setHeader("Authorization", `Bearer ${token}`);
+      res.setHeader("authorization", `Bearer ${token}`);
       res
         .status(201)
         .json({ message: "Employer registered successfully", token, user: employer });
     }
+    res.status(400).json({ message: "Employer registration failed", user });
+
   } catch (error) {
     res.status(500).send("Error registering employer " + error.message);
   }
@@ -78,17 +81,16 @@ router.route("/auth/signup/job-seeker").post(async (req, res) => {
     userData.role = "job seeker";
     const jobSeeker = await registerUser(userData);
     if (jobSeeker) {
-      const token = jwt.sign({ userId: jobSeeker._id }, secret_token, {
+      const token = jwt.sign({ userId: jobSeeker._id, role: jobSeeker.role }, secret_token, {
         expiresIn: "1h",
       });
-      res.setHeader("Authorization", `Bearer ${token}`);
+      res.setHeader("authorization", `Bearer ${token}`);
       res
         .status(201)
         .json({ message: "Employer registered successfully", token, user: jobSeeker });
     }
-    res
-      .status(201)
-      .json({ message: "Job seeker registered successfully", user });
+    res.status(400).json({ message: "Job seeker registration failed", user });
+
   } catch (error) {
     res.status(500).send("Error registering job seeker" + error.message);
   }
@@ -161,11 +163,31 @@ router
 
 router
   .route("/job-seeker/profile")
-  .get(authenticateToken, checkRole("job-seeker"), (req, res) => {
+  .get(authenticateToken, checkRole("job seeker"), (req, res) => {
     res.send("Job seeker profile retrieval");
   })
-  .put(authenticateToken, checkRole("job-seeker"), (req, res) => {
-    res.send("Job seeker profile update");
+  .post(authenticateToken, checkRole("job seeker"), async (req, res) => {
+    try {
+      console.log("Request body:", req.body);
+      const userData = req.body;
+  
+      console.log("Updating profile for userId:", userData._id);
+      console.log("Data for update:", userData);
+      const profileUpdated = await updateUserProfile(userData);
+      if (profileUpdated) {
+        res
+        .status(202)
+        .json({ message: "Job seeker profile successfully updated" });
+      }
+      else {
+        res
+        .status(400)
+        .json({ message: "Job seeker update failed" });
+      }
+    } catch (error) {
+      res.status(500).send("Error updating job seeker profile" + error.message);
+    }
+  
   });
 
 // Payment
