@@ -181,16 +181,54 @@ router
   .get(authenticateToken, checkRole("employer"), (req, res) => {
     res.send("Employer profile retrieval");
   })
-  .put(authenticateToken, checkRole("employer"), (req, res) => {
-    res.send("Employer profile update");
+  .patch(authenticateToken, checkRole("employer"), async (req, res) => {
+    try {
+      console.log("Request body:", req.body);
+      const userData = req.body;
+
+      console.log("Updating profile for userId:", userData._id);
+      console.log("Data for update:", userData);
+      const profileUpdated = await updateUserProfile(userData);
+      if (profileUpdated) {
+        res
+          .status(202)
+          .json({ message: "Job seeker profile successfully updated" });
+      } else {
+        res.status(400).json({ message: "Job seeker update failed" });
+      }
+    } catch (error) {
+      res.status(500).send("Error updating job seeker profile" + error.message);
+    }
   });
+
+
+  router
+  .route("/employer/profile/settings")
+    .put(authenticateToken, checkRole("employer"), async (req, res) => {
+      try {
+        const { id, currentPassword, newPassword } = req.body;
+        const userPasswordUpdated = await checkCurrentAndupdateNewPassword(id, currentPassword, newPassword);
+        console.log("Bckend userPasswordUpdated", userPasswordUpdated);
+        if (userPasswordUpdated) {
+          console.log("Password successfully updated.");
+          res.status(200).json({ success: true, message: "Password updated successfully." });
+        }
+        else {
+          console.log("Failed to update password. Current password is incorrect.");
+          res.status(400).json({ success: false, message: "Failed to update password. Current password is incorrect." });
+        }
+      } catch (error) {
+        console.error("Error while updating password:", error.message);
+        res.status(500).json({ success: false, message: "Internal server error. Password update failed." });
+      }
+  })
 
 router
   .route("/job-seeker/profile")
   .get(authenticateToken, checkRole("job seeker"), (req, res) => {
     res.send("Job seeker profile retrieval");
   })
-  .post(authenticateToken, checkRole("job seeker"), async (req, res) => {
+  .patch(authenticateToken, checkRole("job seeker"), async (req, res) => {
     try {
       console.log("Request body:", req.body);
       const userData = req.body;
