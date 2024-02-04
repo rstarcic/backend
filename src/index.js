@@ -5,7 +5,10 @@ import dotenv from "dotenv";
 dotenv.config();
 import { registerUser } from "./handlers/registrationHandler.js";
 import { checkCredentials } from "./handlers/loginHandler.js";
-import { updateUserProfile } from "./handlers/profileHandler.js";
+import {
+  updateUserProfile,
+  updateOrCreateNestedDocuments,
+} from "./handlers/profileHandler.js";
 import { authenticateToken } from "./middlewares/authMiddleware.js";
 import { checkRole } from "./middlewares/userAccessMiddleware.js";
 const app = express();
@@ -13,7 +16,7 @@ const router = express.Router();
 const port = process.env.PORT || 3000;
 const secret_token = process.env.JWT_SECRET_KEY;
 
-app.use(cors({ exposedHeaders: ['authorization'] }))
+app.use(cors({ exposedHeaders: ["authorization"] }));
 app.use(express.json());
 app.use("/api", router);
 app.use(authenticateToken);
@@ -38,9 +41,13 @@ router.route("/auth/login").post(async (req, res) => {
       userLoginData.password
     );
     if (loggedInUser) {
-      const token = jwt.sign({ userId: loggedInUser._id, role: loggedInUser.role }, secret_token, {
-        expiresIn: "1h",
-      });
+      const token = jwt.sign(
+        { userId: loggedInUser._id, role: loggedInUser.role },
+        secret_token,
+        {
+          expiresIn: "1h",
+        }
+      );
       res.setHeader("authorization", `Bearer ${token}`);
       res
         .status(200)
@@ -60,16 +67,21 @@ router.route("/auth/signup/employer").post(async (req, res) => {
     userData.role = "employer";
     const employer = await registerUser(userData);
     if (employer) {
-      const token = jwt.sign({ userId: employer._id, role: employer.role }, secret_token, {
-        expiresIn: "1h",
-      });
+      const token = jwt.sign(
+        { userId: employer._id, role: employer.role },
+        secret_token,
+        {
+          expiresIn: "1h",
+        }
+      );
       res.setHeader("authorization", `Bearer ${token}`);
-      res
-        .status(201)
-        .json({ message: "Employer registered successfully", token, user: employer });
+      res.status(201).json({
+        message: "Employer registered successfully",
+        token,
+        user: employer,
+      });
     }
     res.status(400).json({ message: "Employer registration failed", user });
-
   } catch (error) {
     res.status(500).send("Error registering employer " + error.message);
   }
@@ -81,16 +93,21 @@ router.route("/auth/signup/job-seeker").post(async (req, res) => {
     userData.role = "job seeker";
     const jobSeeker = await registerUser(userData);
     if (jobSeeker) {
-      const token = jwt.sign({ userId: jobSeeker._id, role: jobSeeker.role }, secret_token, {
-        expiresIn: "1h",
-      });
+      const token = jwt.sign(
+        { userId: jobSeeker._id, role: jobSeeker.role },
+        secret_token,
+        {
+          expiresIn: "1h",
+        }
+      );
       res.setHeader("authorization", `Bearer ${token}`);
-      res
-        .status(201)
-        .json({ message: "Employer registered successfully", token, user: jobSeeker });
+      res.status(201).json({
+        message: "Employer registered successfully",
+        token,
+        user: jobSeeker,
+      });
     }
     res.status(400).json({ message: "Job seeker registration failed", user });
-
   } catch (error) {
     res.status(500).send("Error registering job seeker" + error.message);
   }
@@ -103,10 +120,12 @@ router.route("/employer").get((req, res) => {
 
 router
   .route("/employer/jobs")
-  .get((req, res) => {
+  .get(authenticateToken, checkRole("employer"), (req, res) => {
     res.send("List of jobs");
-  })
-  .post((req, res) => {
+  });
+router
+  .route("/employer/jobs/create")
+  .post(authenticateToken, checkRole("employer"), (req, res) => {
     res.send("Create new job");
   });
 
@@ -131,13 +150,17 @@ router.route("/employer/jobs/:id/contract/send").post((req, res) => {
 });
 
 // Job seeker
-router.route("/job-seeker").get((req, res) => {
-  res.send("Job seeker page");
-});
+router
+  .route("/job-seeker")
+  .get(authenticateToken, checkRole("job seeker"), (req, res) => {
+    res.send("Job seeker page");
+  });
 
-router.route("/job-seeker/jobs").get((req, res) => {
-  res.send("List of jobs");
-});
+router
+  .route("/job-seeker/jobs")
+  .get(authenticateToken, checkRole("job seeker"), (req, res) => {
+    res.send("List of jobs");
+  });
 
 router.route("/job-seeker/jobs/:id").get((req, res) => {
   res.send(`Job details with ID: ${req.params.id}`);
@@ -170,26 +193,93 @@ router
     try {
       console.log("Request body:", req.body);
       const userData = req.body;
-  
+
       console.log("Updating profile for userId:", userData._id);
       console.log("Data for update:", userData);
       const profileUpdated = await updateUserProfile(userData);
       if (profileUpdated) {
         res
-        .status(202)
-        .json({ message: "Job seeker profile successfully updated" });
-      }
-      else {
-        res
-        .status(400)
-        .json({ message: "Job seeker update failed" });
+          .status(202)
+          .json({ message: "Job seeker profile successfully updated" });
+      } else {
+        res.status(400).json({ message: "Job seeker update failed" });
       }
     } catch (error) {
       res.status(500).send("Error updating job seeker profile" + error.message);
     }
-  
   });
 
+router
+  .route("/job-seeker/profile/edit")
+  .post(authenticateToken, checkRole("job seeker"), async (req, res) => {
+    try {
+      const {
+        _id,
+        aboutMe,
+        education,
+        workExperience,
+        languages,
+        hobbiesAndInterests,
+        skills,
+      } = req.body;
+      console.log("Body:", req.body);
+      const updatedAboutMeResult = await updateOrCreateNestedDocuments(
+        _id,
+        aboutMe,
+        "Biography"
+      );
+      const updatedEducationResult = await updateOrCreateNestedDocuments(
+        _id,
+        education,
+        "Education"
+      );
+      const updatedWorkExperienceResult = await updateOrCreateNestedDocuments(
+        _id,
+        workExperience,
+        "WorkExperience"
+      );
+      const updatedLanguagesResult = await updateOrCreateNestedDocuments(
+        _id,
+        languages,
+        "Languages"
+      );
+      const updatedhobbiesAndInterestsResult =
+        await updateOrCreateNestedDocuments(
+          _id,
+          hobbiesAndInterests,
+          "HobbiesAndInterests"
+        );
+      const updatedSkillsResult = await updateOrCreateNestedDocuments(
+        _id,
+        skills,
+        "Skills"
+      );
+      if (
+        updatedAboutMeResult &&
+        updatedEducationResult &&
+        updatedWorkExperienceResult &&
+        updatedLanguagesResult &&
+        updatedhobbiesAndInterestsResult &&
+        updatedSkillsResult
+      ) {
+        res
+          .status(200)
+          .json({
+            success: true,
+            message: "All data successfully updated or created",
+          });
+      } else {
+        res
+          .status(404)
+          .json({
+            success: false,
+            message: "Some data could not be updated or created",
+          });
+      }
+    } catch (error) {
+      res.status(500).send("Error updating job seeker profile" + error.message);
+    }
+  });
 // Payment
 router.route("/payment").post((req, res) => {
   res.send("Processing payment.");
