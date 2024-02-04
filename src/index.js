@@ -9,6 +9,7 @@ import {
   updateUserProfile,
   updateOrCreateNestedDocuments,
 } from "./handlers/profileHandler.js";
+import { checkCurrentAndupdateNewPassword } from "./handlers/passwordHandler.js";
 import { authenticateToken } from "./middlewares/authMiddleware.js";
 import { checkRole } from "./middlewares/userAccessMiddleware.js";
 const app = express();
@@ -280,6 +281,27 @@ router
       res.status(500).send("Error updating job seeker profile" + error.message);
     }
   });
+
+  router
+  .route("/job-seeker/profile/settings")
+    .put(authenticateToken, checkRole("job seeker"), async (req, res) => {
+      try {
+        const { id, currentPassword, newPassword } = req.body;
+        const userPasswordUpdated = await checkCurrentAndupdateNewPassword(id, currentPassword, newPassword);
+        console.log("Bckend userPasswordUpdated", userPasswordUpdated);
+        if (userPasswordUpdated) {
+          console.log("Password successfully updated.");
+          res.status(200).json({ success: true, message: "Password updated successfully." });
+        }
+        else {
+          console.log("Failed to update password. Current password is incorrect.");
+          res.status(400).json({ success: false, message: "Failed to update password. Current password is incorrect." });
+        }
+      } catch (error) {
+        console.error("Error while updating password:", error.message);
+        res.status(500).json({ success: false, message: "Internal server error. Password update failed." });
+      }
+  })
 // Payment
 router.route("/payment").post((req, res) => {
   res.send("Processing payment.");
