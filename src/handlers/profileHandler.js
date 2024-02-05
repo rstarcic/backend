@@ -35,8 +35,6 @@ async function updateOrCreateNestedDocuments(
       user[documentName].push(...dataToAdd);
       console.log("user[documentName] pushed: ", user[documentName]);
     }
-    console.log("DOcument name: ", documentName);
-    console.log("DOcument VALUE: ", user[documentName]);
     await db
       .collection("users")
       .updateOne(
@@ -51,7 +49,7 @@ async function updateOrCreateNestedDocuments(
   } catch (error) {
     return {
       success: false,
-      message: `Greška prilikom ažuriranja subkolekcije ${documentName}`,
+      message: `Error during update ${documentName}`,
       error: error.message,
     };
   }

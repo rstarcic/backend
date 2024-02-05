@@ -10,6 +10,7 @@ import {
   updateOrCreateNestedDocuments,
 } from "./handlers/profileHandler.js";
 import { checkCurrentAndupdateNewPassword } from "./handlers/passwordHandler.js";
+import { createAJob } from "./handlers/jobHandler.js";
 import { authenticateToken } from "./middlewares/authMiddleware.js";
 import { checkRole } from "./middlewares/userAccessMiddleware.js";
 const app = express();
@@ -124,10 +125,36 @@ router
   .get(authenticateToken, checkRole("employer"), (req, res) => {
     res.send("List of jobs");
   });
+
 router
   .route("/employer/jobs/create")
-  .post(authenticateToken, checkRole("employer"), (req, res) => {
-    res.send("Create new job");
+  .post(authenticateToken, checkRole("employer"), async (req, res) => {
+    try {
+      const { employerId, ...jobData } = req.body;
+      console.log("Body:", req.body);
+      console.log("Backend job data: ", jobData);
+      const jobCreated = await createAJob(employerId, jobData);
+      if (jobCreated.success) {
+        return res.status(201).json({
+          success: true,
+          message: jobCreated.message,
+          job: jobCreated,
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: jobCreated.message,
+        });
+      }
+    } catch (error) {
+      console.error("Error while creating job:", error.message);
+      res
+        .status(500)
+        .json({
+          success: false,
+          message: "Internal server error. Job creation failed.",
+        });
+    }
   });
 
 router
@@ -201,27 +228,44 @@ router
     }
   });
 
-
-  router
+router
   .route("/employer/profile/settings")
-    .put(authenticateToken, checkRole("employer"), async (req, res) => {
-      try {
-        const { id, currentPassword, newPassword } = req.body;
-        const userPasswordUpdated = await checkCurrentAndupdateNewPassword(id, currentPassword, newPassword);
-        console.log("Bckend userPasswordUpdated", userPasswordUpdated);
-        if (userPasswordUpdated) {
-          console.log("Password successfully updated.");
-          res.status(200).json({ success: true, message: "Password updated successfully." });
-        }
-        else {
-          console.log("Failed to update password. Current password is incorrect.");
-          res.status(400).json({ success: false, message: "Failed to update password. Current password is incorrect." });
-        }
-      } catch (error) {
-        console.error("Error while updating password:", error.message);
-        res.status(500).json({ success: false, message: "Internal server error. Password update failed." });
+  .put(authenticateToken, checkRole("employer"), async (req, res) => {
+    try {
+      const { id, currentPassword, newPassword } = req.body;
+      const userPasswordUpdated = await checkCurrentAndupdateNewPassword(
+        id,
+        currentPassword,
+        newPassword
+      );
+      console.log("Bckend userPasswordUpdated", userPasswordUpdated);
+      if (userPasswordUpdated) {
+        console.log("Password successfully updated.");
+        res
+          .status(200)
+          .json({ success: true, message: "Password updated successfully." });
+      } else {
+        console.log(
+          "Failed to update password. Current password is incorrect."
+        );
+        res
+          .status(400)
+          .json({
+            success: false,
+            message:
+              "Failed to update password. Current password is incorrect.",
+          });
       }
-  })
+    } catch (error) {
+      console.error("Error while updating password:", error.message);
+      res
+        .status(500)
+        .json({
+          success: false,
+          message: "Internal server error. Password update failed.",
+        });
+    }
+  });
 
 router
   .route("/job-seeker/profile")
@@ -301,45 +345,59 @@ router
         updatedhobbiesAndInterestsResult &&
         updatedSkillsResult
       ) {
-        res
-          .status(200)
-          .json({
-            success: true,
-            message: "All data successfully updated or created",
-          });
+        res.status(200).json({
+          success: true,
+          message: "All data successfully updated or created",
+        });
       } else {
-        res
-          .status(404)
-          .json({
-            success: false,
-            message: "Some data could not be updated or created",
-          });
+        res.status(404).json({
+          success: false,
+          message: "Some data could not be updated or created",
+        });
       }
     } catch (error) {
       res.status(500).send("Error updating job seeker profile" + error.message);
     }
   });
 
-  router
+router
   .route("/job-seeker/profile/settings")
-    .put(authenticateToken, checkRole("job seeker"), async (req, res) => {
-      try {
-        const { id, currentPassword, newPassword } = req.body;
-        const userPasswordUpdated = await checkCurrentAndupdateNewPassword(id, currentPassword, newPassword);
-        console.log("Bckend userPasswordUpdated", userPasswordUpdated);
-        if (userPasswordUpdated) {
-          console.log("Password successfully updated.");
-          res.status(200).json({ success: true, message: "Password updated successfully." });
-        }
-        else {
-          console.log("Failed to update password. Current password is incorrect.");
-          res.status(400).json({ success: false, message: "Failed to update password. Current password is incorrect." });
-        }
-      } catch (error) {
-        console.error("Error while updating password:", error.message);
-        res.status(500).json({ success: false, message: "Internal server error. Password update failed." });
+  .put(authenticateToken, checkRole("job seeker"), async (req, res) => {
+    try {
+      const { id, currentPassword, newPassword } = req.body;
+      const userPasswordUpdated = await checkCurrentAndupdateNewPassword(
+        id,
+        currentPassword,
+        newPassword
+      );
+      console.log("Bckend userPasswordUpdated", userPasswordUpdated);
+      if (userPasswordUpdated) {
+        console.log("Password successfully updated.");
+        res
+          .status(200)
+          .json({ success: true, message: "Password updated successfully." });
+      } else {
+        console.log(
+          "Failed to update password. Current password is incorrect."
+        );
+        res
+          .status(400)
+          .json({
+            success: false,
+            message:
+              "Failed to update password. Current password is incorrect.",
+          });
       }
-  })
+    } catch (error) {
+      console.error("Error while updating password:", error.message);
+      res
+        .status(500)
+        .json({
+          success: false,
+          message: "Internal server error. Password update failed.",
+        });
+    }
+  });
 // Payment
 router.route("/payment").post((req, res) => {
   res.send("Processing payment.");
