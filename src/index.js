@@ -10,7 +10,7 @@ import {
   updateOrCreateNestedDocuments,
 } from "./handlers/profileHandler.js";
 import { checkCurrentAndupdateNewPassword } from "./handlers/passwordHandler.js";
-import { createAJob } from "./handlers/jobHandler.js";
+import { createAJob, getJobsByEmployerId, getJobDetailsData, updateJobDetailsData, deleteJob } from "./handlers/jobHandler.js";
 import { authenticateToken } from "./middlewares/authMiddleware.js";
 import { checkRole } from "./middlewares/userAccessMiddleware.js";
 const app = express();
@@ -122,23 +122,30 @@ router.route("/employer").get((req, res) => {
 
 router
   .route("/employer/jobs")
-  .get(authenticateToken, checkRole("employer"), (req, res) => {
-    res.send("List of jobs");
-  });
+  .get(authenticateToken, checkRole("employer"), async (req, res) => {
+    try {
+      const employerId = req.query.employerId;
+      const jobList = await getJobsByEmployerId(employerId);
 
-router
+      if (!jobList) {
+        return res.status(404).json({ error: "No jobs found for this employer" });
+      } else {
+        return res.status(200).json(jobList);
+      }
+    } catch (error) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+  router
   .route("/employer/jobs/create")
   .post(authenticateToken, checkRole("employer"), async (req, res) => {
     try {
       const { employerId, ...jobData } = req.body;
-      console.log("Body:", req.body);
-      console.log("Backend job data: ", jobData);
       const jobCreated = await createAJob(employerId, jobData);
       if (jobCreated.success) {
         return res.status(201).json({
           success: true,
           message: jobCreated.message,
-          job: jobCreated,
         });
       } else {
         return res.status(400).json({
@@ -148,25 +155,60 @@ router
       }
     } catch (error) {
       console.error("Error while creating job:", error.message);
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "Internal server error. Job creation failed.",
-        });
+      res.status(500).json({
+        success: false,
+        message: "Internal server error. Job creation failed.",
+      });
     }
   });
 
 router
   .route("/employer/jobs/:id")
-  .get((req, res) => {
-    res.send(`Job details with ID: ${req.params.id}`);
+  .get(async (req, res) => {
+    try {
+      const id = req.params.id;
+      const jobDetails = await getJobDetailsData(id);
+      if (!jobDetails) {
+        return res
+          .status(404)
+          .json({ error: "No job details found for this job ID." });
+      } else {
+        return res.status(200).json({ success:true, jobDetails });
+      }
+    } catch (error) {
+      return res.status(500).json({ error: "Internal server error", message: error.message });
+    }
   })
-  .put((req, res) => {
-    res.send(`Update job with ID: ${req.params.id}`);
+  .put(async (req, res) => {
+    try {
+      const id = req.params.id;
+      const dataToUpdate = req.body;
+      const updatedJobDetails = await updateJobDetailsData(id, dataToUpdate);
+      if (!updatedJobDetails) {
+        return res
+          .status(404)
+          .json({ error: "No job details found for this job ID." });
+      } else {
+        return res.status(200).json({ success:true, updatedJobDetails });
+      }
+    } catch (error) {
+      return res.status(500).json({ error: "Internal server error", message: error.message });
+    }
   })
-  .delete((req, res) => {
-    res.send(`Delete job with ID: ${req.params.id}`);
+  .delete(async (req, res) => {
+    try {
+      const id = req.params.id;
+      const jobDeleted = await deleteJob(id);
+      if (!jobDeleted) {
+        return res
+          .status(404)
+          .json({ error: "No job details found for this job ID." });
+      } else {
+        return res.status(200).json({ success:true, message: "Job successfully deleted" });
+      }
+    } catch (error) {
+      return res.status(500).json({ error: "Internal server error", message: error.message });
+    }
   });
 
 router.route("/employer/jobs/:id/contract").post((req, res) => {
@@ -248,22 +290,17 @@ router
         console.log(
           "Failed to update password. Current password is incorrect."
         );
-        res
-          .status(400)
-          .json({
-            success: false,
-            message:
-              "Failed to update password. Current password is incorrect.",
-          });
+        res.status(400).json({
+          success: false,
+          message: "Failed to update password. Current password is incorrect.",
+        });
       }
     } catch (error) {
       console.error("Error while updating password:", error.message);
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "Internal server error. Password update failed.",
-        });
+      res.status(500).json({
+        success: false,
+        message: "Internal server error. Password update failed.",
+      });
     }
   });
 
@@ -380,22 +417,17 @@ router
         console.log(
           "Failed to update password. Current password is incorrect."
         );
-        res
-          .status(400)
-          .json({
-            success: false,
-            message:
-              "Failed to update password. Current password is incorrect.",
-          });
+        res.status(400).json({
+          success: false,
+          message: "Failed to update password. Current password is incorrect.",
+        });
       }
     } catch (error) {
       console.error("Error while updating password:", error.message);
-      res
-        .status(500)
-        .json({
-          success: false,
-          message: "Internal server error. Password update failed.",
-        });
+      res.status(500).json({
+        success: false,
+        message: "Internal server error. Password update failed.",
+      });
     }
   });
 // Payment
