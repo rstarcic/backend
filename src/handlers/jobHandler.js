@@ -152,6 +152,23 @@ async function getJobsByJobSeekerId(jobSeekerId) {
     throw new Error("Error during job data fetching: " + error.message);
   }
 }
+
+async function getJobDetailsWithApplicantsData(id) {
+  try {
+    const jobDetails = await db
+      .collection("jobs")
+      .findOne({ _id: new ObjectId(id) });
+    if (!jobDetails) {
+      return null;
+    }
+    const applicantIds = jobDetails.applicants.map(applicant => new ObjectId(applicant.jobSeekerId));
+    const applicants = await db.collection('users').find({ _id: { $in: applicantIds } }).toArray();
+    jobDetails.applicantDetails = applicants;
+    return jobDetails;
+  } catch (error) {
+    throw new Error("Error during job details fetching: " + error.message);
+  }
+}
 export {
   createAJob,
   getJobsByEmployerId,
@@ -161,4 +178,5 @@ export {
   getAllJobs,
   addJobApplication,
   getJobsByJobSeekerId,
+  getJobDetailsWithApplicantsData
 };

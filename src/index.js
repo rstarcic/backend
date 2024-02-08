@@ -14,6 +14,7 @@ import {
   createAJob,
   getJobsByEmployerId,
   getJobDetailsData,
+  getJobDetailsWithApplicantsData,
   updateJobDetailsData,
   deleteJob,
   getAllJobs,
@@ -178,7 +179,7 @@ router
   .get(authenticateToken, checkRole("employer"), async (req, res) => {
     try {
       const id = req.params.id;
-      const jobDetails = await getJobDetailsData(id);
+      const jobDetails = await getJobDetailsWithApplicantsData(id);
       if (!jobDetails) {
         return res
           .status(404)
