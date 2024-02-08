@@ -10,7 +10,16 @@ import {
   updateOrCreateNestedDocuments,
 } from "./handlers/profileHandler.js";
 import { checkCurrentAndupdateNewPassword } from "./handlers/passwordHandler.js";
-import { createAJob, getJobsByEmployerId, getJobDetailsData, updateJobDetailsData, deleteJob, getAllJobs } from "./handlers/jobHandler.js";
+import {
+  createAJob,
+  getJobsByEmployerId,
+  getJobDetailsData,
+  updateJobDetailsData,
+  deleteJob,
+  getAllJobs,
+  addJobApplication,
+  getJobsByJobSeekerId
+} from "./handlers/jobHandler.js";
 import { authenticateToken } from "./middlewares/authMiddleware.js";
 import { checkRole } from "./middlewares/userAccessMiddleware.js";
 const app = express();
@@ -128,7 +137,9 @@ router
       const jobList = await getJobsByEmployerId(employerId);
 
       if (!jobList) {
-        return res.status(404).json({ error: "No jobs found for this employer" });
+        return res
+          .status(404)
+          .json({ error: "No jobs found for this employer" });
       } else {
         return res.status(200).json(jobList);
       }
@@ -136,7 +147,7 @@ router
       return res.status(500).json({ error: "Internal server error" });
     }
   });
-  router
+router
   .route("/employer/jobs/create")
   .post(authenticateToken, checkRole("employer"), async (req, res) => {
     try {
@@ -164,7 +175,7 @@ router
 
 router
   .route("/employer/jobs/:id")
-  .get(async (req, res) => {
+  .get(authenticateToken, checkRole("employer"), async (req, res) => {
     try {
       const id = req.params.id;
       const jobDetails = await getJobDetailsData(id);
@@ -173,13 +184,15 @@ router
           .status(404)
           .json({ error: "No job details found for this job ID." });
       } else {
-        return res.status(200).json({ success:true, jobDetails });
+        return res.status(200).json({ success: true, jobDetails });
       }
     } catch (error) {
-      return res.status(500).json({ error: "Internal server error", message: error.message });
+      return res
+        .status(500)
+        .json({ error: "Internal server error", message: error.message });
     }
   })
-  .put(async (req, res) => {
+  .put(authenticateToken, checkRole("employer"), async (req, res) => {
     try {
       const id = req.params.id;
       const dataToUpdate = req.body;
@@ -189,10 +202,12 @@ router
           .status(404)
           .json({ error: "No job details found for this job ID." });
       } else {
-        return res.status(200).json({ success:true, updatedJobDetails });
+        return res.status(200).json({ success: true, updatedJobDetails });
       }
     } catch (error) {
-      return res.status(500).json({ error: "Internal server error", message: error.message });
+      return res
+        .status(500)
+        .json({ error: "Internal server error", message: error.message });
     }
   })
   .delete(async (req, res) => {
@@ -204,10 +219,14 @@ router
           .status(404)
           .json({ error: "No job details found for this job ID." });
       } else {
-        return res.status(200).json({ success:true, message: "Job successfully deleted" });
+        return res
+          .status(200)
+          .json({ success: true, message: "Job successfully deleted" });
       }
     } catch (error) {
-      return res.status(500).json({ error: "Internal server error", message: error.message });
+      return res
+        .status(500)
+        .json({ error: "Internal server error", message: error.message });
     }
   });
 
@@ -228,32 +247,87 @@ router
 
 router
   .route("/job-seeker/jobs")
-  .get(authenticateToken, checkRole("job seeker"),async (req, res) => {
+  .get(authenticateToken, checkRole("job seeker"), async (req, res) => {
     try {
       const { location } = req.query;
       const allJobs = await getAllJobs(location);
 
       if (allJobs.length === 0) {
-        return res.status(404).json({ success:false, error: "No jobs found for this job seeker" });
+        return res
+          .status(404)
+          .json({ success: false, error: "No jobs found for this job seeker" });
       } else {
         return res.status(200).json({ success: true, allJobs });
       }
     } catch (error) {
-      return res.status(500).json({ success: false, error: "Internal server error" });
+      return res
+        .status(500)
+        .json({ success: false, error: "Internal server error" });
     }
   });
 
-router.route("/job-seeker/jobs/:id").get((req, res) => {
-  res.send(`Job details with ID: ${req.params.id}`);
+  
+router.route("/job-seeker/jobs/applied").get( async (req, res) => {
+  try {
+    const jobSeekerId = req.query.jobSeekerId;
+    const jobList = await getJobsByJobSeekerId(jobSeekerId);
+    if (!jobList) {
+      return res
+        .status(404)
+        .json({ error: "No jobs found for this job seeeker" });
+    } else {
+      return res.status(200).json(jobList);
+    }
+  } catch (error) {
+    return res.status(500).json({ error: "Internal server error" });
+  }
 });
 
-router.route("/job-seeker/jobs/:id/apply").put((req, res) => {
-  res.send(`Apply for job with ID: ${req.params.id}`);
-});
-
-router.route("/job-seeker/applied").get((req, res) => {
-  res.send("List of jobs the job seeker has applied for");
-});
+router
+  .route("/job-seeker/jobs/:id")
+  .get(authenticateToken, checkRole("job seeker"), async (req, res) => {
+    try {
+      const id = req.params.id;
+      const jobDetails = await getJobDetailsData(id);
+      if (!jobDetails) {
+        return res
+          .status(404)
+          .json({ error: "No job details found for this job ID." });
+      } else {
+        return res.status(200).json({ success: true, jobDetails });
+      }
+    } catch (error) {
+      return res
+        .status(500)
+        .json({ error: "Internal server error", message: error.message });
+    }
+  })
+  .patch(authenticateToken, checkRole("job seeker"), async (req, res) => {
+    try {
+      const id = req.params.id;
+      const jobSeekerId = req.body.jobSeekerId;
+      console.log("Id backend: ", id);
+      console.log("Job seekerId backend: ", jobSeekerId);
+      const jobSeekerApplied = await addJobApplication(id, jobSeekerId);
+      if (jobSeekerApplied.success) {
+        return res.status(201).json({
+          success: true,
+          message: "Job application successful",
+          updatedJob: jobSeekerApplied.updatedJob,
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Job application failed",
+        });
+      }
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to process job application: " + error.message,
+      });
+    }
+  });
 
 // Profiles
 router
