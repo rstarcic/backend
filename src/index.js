@@ -10,7 +10,7 @@ import {
   updateOrCreateNestedDocuments,
 } from "./handlers/profileHandler.js";
 import { checkCurrentAndupdateNewPassword } from "./handlers/passwordHandler.js";
-import { createAJob, getJobsByEmployerId, getJobDetailsData, updateJobDetailsData, deleteJob } from "./handlers/jobHandler.js";
+import { createAJob, getJobsByEmployerId, getJobDetailsData, updateJobDetailsData, deleteJob, getAllJobs } from "./handlers/jobHandler.js";
 import { authenticateToken } from "./middlewares/authMiddleware.js";
 import { checkRole } from "./middlewares/userAccessMiddleware.js";
 const app = express();
@@ -228,8 +228,19 @@ router
 
 router
   .route("/job-seeker/jobs")
-  .get(authenticateToken, checkRole("job seeker"), (req, res) => {
-    res.send("List of jobs");
+  .get(authenticateToken, checkRole("job seeker"),async (req, res) => {
+    try {
+      const { location } = req.query;
+      const allJobs = await getAllJobs(location);
+
+      if (allJobs.length === 0) {
+        return res.status(404).json({ success:false, error: "No jobs found for this job seeker" });
+      } else {
+        return res.status(200).json({ success: true, allJobs });
+      }
+    } catch (error) {
+      return res.status(500).json({ success: false, error: "Internal server error" });
+    }
   });
 
 router.route("/job-seeker/jobs/:id").get((req, res) => {
@@ -280,7 +291,6 @@ router
         currentPassword,
         newPassword
       );
-      console.log("Bckend userPasswordUpdated", userPasswordUpdated);
       if (userPasswordUpdated) {
         console.log("Password successfully updated.");
         res
@@ -407,7 +417,6 @@ router
         currentPassword,
         newPassword
       );
-      console.log("Bckend userPasswordUpdated", userPasswordUpdated);
       if (userPasswordUpdated) {
         console.log("Password successfully updated.");
         res

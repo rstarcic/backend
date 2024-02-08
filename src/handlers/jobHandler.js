@@ -94,11 +94,29 @@ async function deleteJob(id) {
   } catch (error) {
     throw new Error("Error during job details fetching: " + error.message);
   }
+
+}
+
+async function getAllJobs(location) {
+  try {
+    let query = {}; 
+
+    if (location) {
+      query.location = location; 
+    }
+    
+    const jobs = await db
+      .collection("jobs").find(query).toArray();
+    return jobs;
+  } catch (error) {
+    throw new Error("Error during job fetching: " + error.message);
+  }
 }
 export {
   createAJob,
   getJobsByEmployerId,
   getJobDetailsData,
   updateJobDetailsData,
-  deleteJob
+  deleteJob,
+  getAllJobs
 };
