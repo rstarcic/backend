@@ -39,10 +39,6 @@ router.route("/").get((req, res) => {
   res.send("Welcome to the Jobify home page!");
 });
 
-// About page
-router.route("/about").get((req, res) => {
-  res.send("Learn more about Jobify on our About page");
-});
 
 // Login
 router.route("/auth/login").post(async (req, res) => {
@@ -180,6 +176,7 @@ router
     try {
       const id = req.params.id;
       const jobDetails = await getJobDetailsWithApplicantsData(id);
+      console.log(jobDetails)
       if (!jobDetails) {
         return res
           .status(404)
@@ -250,8 +247,8 @@ router
   .route("/job-seeker/jobs")
   .get(authenticateToken, checkRole("job seeker"), async (req, res) => {
     try {
-      const { location } = req.query;
-      const allJobs = await getAllJobs(location);
+      const { category, location } = req.query;
+      const allJobs = await getAllJobs(category, location);
 
       if (allJobs.length === 0) {
         return res

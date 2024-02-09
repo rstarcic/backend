@@ -94,10 +94,13 @@ async function deleteJob(id) {
   }
 }
 
-async function getAllJobs(location) {
+async function getAllJobs(category, location) {
   try {
     let query = {};
 
+    if (category) {
+      query.category = category;
+    }
     if (location) {
       query.location = location;
     }
@@ -161,9 +164,14 @@ async function getJobDetailsWithApplicantsData(id) {
     if (!jobDetails) {
       return null;
     }
-    const applicantIds = jobDetails.applicants.map(applicant => new ObjectId(applicant.jobSeekerId));
-    const applicants = await db.collection('users').find({ _id: { $in: applicantIds } }).toArray();
-    jobDetails.applicantDetails = applicants;
+    if (jobDetails.applicants && Array.isArray(jobDetails.applicants) && jobDetails.applicants.length > 0) {
+      const applicantIds = jobDetails.applicants.map(applicant => new ObjectId(applicant.jobSeekerId));
+      const applicants = await db.collection('users').find({ _id: { $in: applicantIds } }).toArray();
+      jobDetails.applicantDetails = applicants;
+    } else {
+      jobDetails.applicantDetails = [];
+    }
+    console.log("B job details:", jobDetails)
     return jobDetails;
   } catch (error) {
     throw new Error("Error during job details fetching: " + error.message);
